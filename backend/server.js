@@ -97,6 +97,42 @@ app.get("/api/courses", async (req, res) => {
   }
 });
 
+// ---------- Enrolled course access ----------
+// This endpoint never enrols a learner. It only checks their existing Moodle enrolments.
+app.get("/api/courses/:id/access", requireLogin, async (req, res) => {
+  const courseId = Number(req.params.id);
+  if (!Number.isSafeInteger(courseId) || courseId < 1) {
+    return res.status(400).json({ error: "Invalid course ID." });
+  }
+
+  try {
+    const enrolledCourses = await callMoodle({
+      wsfunction: "core_enrol_get_users_courses",
+      userid: String(req.session.user.id),
+    });
+
+    if (!Array.isArray(enrolledCourses)) {
+      return res.status(502).json({ error: "Moodle returned an unexpected enrolment response." });
+    }
+
+    const isEnrolled = enrolledCourses.some((course) => Number(course.id) === courseId);
+    if (!isEnrolled) {
+      return res.status(403).json({
+        error: "You are not enrolled in this course. Course access is limited to existing enrolments.",
+      });
+    }
+
+    // The URL is generated from the configured Moodle base URL and a validated numeric course ID.
+    res.json({ courseUrl: `${MOODLE_URL}/course/view.php?id=${courseId}` });
+  } catch (err) {
+    console.error("Course access check failed:", err.moodleCode || "", err.message);
+    res.status(502).json({
+      error: "Could not verify your course enrolment with Moodle.",
+      ...(IS_PROD ? {} : { details: err.message, moodleCode: err.moodleCode || null }),
+    });
+  }
+});
+
 // ---------- Register ----------
 app.post("/api/register", async (req, res) => {
   const { firstname, lastname, email, password } = req.body || {};
