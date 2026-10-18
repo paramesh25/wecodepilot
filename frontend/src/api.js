@@ -19,6 +19,7 @@ async function request(path, options = {}) {
 
 export const api = {
   courses: () => request('/api/courses'),
+  courseAccess: (id) => request(`/api/courses/${encodeURIComponent(id)}/access`),
   me: () => request('/api/me'),
   login: (email, password) => request('/api/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   register: (payload) => request('/api/register', { method: 'POST', body: JSON.stringify(payload) }),
